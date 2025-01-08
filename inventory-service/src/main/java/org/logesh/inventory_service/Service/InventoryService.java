@@ -1,6 +1,8 @@
 package org.logesh.inventory_service.Service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.logesh.inventory_service.Dto.InventoryResponse;
 import org.logesh.inventory_service.Repository.InventoryRepository;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.util.List;
 import static java.util.stream.Collectors.toList;
 
 @Service
+@Slf4j
 public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
@@ -21,7 +24,11 @@ public class InventoryService {
     }
 
     @Transactional(readOnly = true)
+    @SneakyThrows
     public List<InventoryResponse> isInStock(List<String> skuCode){
+        log.info("Wait Started");
+//        Thread.sleep(10000);
+        log.info("Wait Ended");
         return inventoryRepository.findBySkuCodeIn(skuCode).stream()
                 .map(inventory -> {
                     Inventory inv = (Inventory) inventory;

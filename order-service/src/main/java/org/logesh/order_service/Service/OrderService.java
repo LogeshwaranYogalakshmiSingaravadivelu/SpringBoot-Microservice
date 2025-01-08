@@ -25,7 +25,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
 
-    public void placeOrder(OrderRequest orderRequest) {
+    public String placeOrder(OrderRequest orderRequest) {
         Order order = new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
         List<OrderLineItems> orderLineItems = orderRequest.getOrderLineItemsDtoList()
@@ -50,6 +50,7 @@ public class OrderService {
 
         if(allProductsInStock) {
             orderRepository.save(order);
+            return "Order Placed Successfully";
         }else{
             throw new IllegalArgumentException("Product is not in Stock, please try again later");
         }
