@@ -1,5 +1,7 @@
 package org.logesh.order_service.Service;
 
+import brave.Span;
+import brave.Tracer;
 import lombok.RequiredArgsConstructor;
 import org.logesh.order_service.Dto.InventoryResponse;
 import org.logesh.order_service.Dto.OrderLineItemsDto;
@@ -24,6 +26,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
 
     public String placeOrder(OrderRequest orderRequest) {
         Order order = new Order();
@@ -38,21 +41,27 @@ public class OrderService {
                 .map(OrderLineItems::getSkucode)
                 .toList();
 
-        InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
-                .uri("http://inventory-service/api/inventory",
-                        uriBuilder -> uriBuilder.queryParam("skuCode", skuCodes).build())
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block();
+        Span inventoryServiceLookup = tracer.nextSpan().name("InventoryServiceLookup");
 
-        boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
-                .allMatch(InventoryResponse::isInStock);
+        try(Tracer.SpanInScope spanInScope = tracer.withSpanInScope(inventoryServiceLookup.start())){
+            InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
+                    .uri("http://inventory-service/api/inventory",
+                            uriBuilder -> uriBuilder.queryParam("skuCode", skuCodes).build())
+                    .retrieve()
+                    .bodyToMono(InventoryResponse[].class)
+                    .block();
 
-        if(allProductsInStock) {
-            orderRepository.save(order);
-            return "Order Placed Successfully";
-        }else{
-            throw new IllegalArgumentException("Product is not in Stock, please try again later");
+            boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
+                    .allMatch(InventoryResponse::isInStock);
+
+            if(allProductsInStock) {
+                orderRepository.save(order);
+                return "Order Placed Successfully";
+            }else{
+                throw new IllegalArgumentException("Product is not in Stock, please try again later");
+            }
+        }finally {
+            inventoryServiceLookup.finish();
         }
     }
 
